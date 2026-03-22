@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
-
+const Analytics = require('./models/Analytics');
 const { paymentRoutes } = require('./routes/ProductRoutes');
 const authRoutes = require('./routes/authRoutes');
 const artRoutes = require('./routes/artRoutes');
@@ -31,7 +31,14 @@ app.use('/api/art', artRoutes);
 app.use('/api/commerce', commerceRoutes);
 app.use('/api/v1', paymentRoutes);
 app.use('/api/admin', adminRoutes);
-
+app.get('/analytics/users', async (req, res) => {
+    try {
+        const analyticsData = await Analytics.find({});
+        res.json(analyticsData);
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching analytics data", error: error.message });
+    }
+});
 app.get('/', (req, res) => res.send("🚀 ArtVista Backend Live!"));
 
 // 5. SERVER START
