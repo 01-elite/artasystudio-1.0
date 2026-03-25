@@ -5,7 +5,11 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     
-    // ✅ NEW PLACES FOR PERMANENT STORAGE
+    // ✅ NEW AI-BASED BEHAVIOR TRACKING (Added)
+    viewedArt: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Artwork' }],
+    bidArt: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Artwork' }],
+    
+    // ✅ NEW PLACES FOR PERMANENT STORAGE (Kept)
     username: { type: String, unique: true, sparse: true }, 
     categoryPreferences: [{ type: String }], // Array for multiple interests
     
