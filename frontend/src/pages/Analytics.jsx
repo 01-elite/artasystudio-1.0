@@ -183,14 +183,14 @@ const Analytics = () => {
                                             const position = geoMap[node._id?.toLowerCase().trim()] || [20, 78];
                                             return (
                                                 <CircleMarker 
-                                                    key={i} 
-                                                    center={position} 
-                                                    radius={Math.max(node.count * 12, 10)} 
-                                                    fillColor="#FF8C00" 
-                                                    color="#fff" 
-                                                    weight={2} 
-                                                    fillOpacity={0.8}
-                                                >
+                                                   key={i} 
+                                                   center={position} 
+                                                   radius={10}
+                                                   fillOpacity={0}  // ❌ remove fill
+                                                        color="#FF8C00"
+                                                   weight={2}
+                                                   dashArray="3,5"   // 👈 dotted border
+                                                   >
                                                     <MapTooltip direction="top" opacity={1} sticky>
                                                         <div className="bg-black text-white p-2 rounded-lg text-[10px] font-black uppercase tracking-widest">
                                                             {node._id}: {node.count} Orders

@@ -12,7 +12,7 @@ import PaymentSuccess from './components/PaymentSuccess';
 // import AdminDashboard from './pages/AdminDashboard';  <-- YE LINE DELETE KAR DI HAI
 import Analytics from './pages/Analytics'; 
 import Footer from './components/Footer';
-
+import Chatbot from './pages/Chatbot';
 function App() {
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
 
@@ -37,7 +37,7 @@ function App() {
             <Route path="/" element={<Explore />} />
             <Route path="/login" element={!user ? <Auth /> : <Navigate to="/" />} />
             <Route path="/profile/:userId?" element={user ? <Profile /> : <Navigate to="/login" />} />
-            
+            <Route path="/chatbot" element={user ? <Chatbot /> : <Navigate to="/login" />} />
             {/* ADMIN ROUTES - Ab dono Analytics kholenge */}
             <Route path="/admin-panel" element={user?.role === 'admin' ? <Analytics /> : <Navigate to="/" />} />
             <Route path="/analytics" element={user?.role === 'admin' ? <Analytics /> : <Navigate to="/" />} />
