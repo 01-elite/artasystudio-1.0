@@ -416,7 +416,7 @@ const Explore = () => {
                 </AnimatePresence>
 
                 <div className="relative group">
-                    <div className="absolute right-20 top-1/2 -translate-y-1/2 px-4 py-2 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-xl border border-white/10 pointer-events-none translate-x-4 group-hover:translate-x-0">Ask AI kuch?</div>
+                    <div className="absolute right-20 top-1/2 -translate-y-1/2 px-4 py-2 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2 opacity-0 group-hover:opacity-100 transition-all shadow-xl border border-white/10 pointer-events-none translate-x-4 group-hover:translate-x-0">Ask AI anything?</div>
                     <button onClick={() => setIsChatOpen(!isChatOpen)} className="w-20 h-20 bg-[#0A0A0A] border-[6px] border-[#FF8C00] rounded-full flex flex-col items-center justify-center text-[#FF8C00] shadow-[0_10px_40px_rgba(255,140,0,0.4)] hover:scale-110 active:scale-90 overflow-hidden" >
                         <div className="absolute inset-0 bg-[#FF8C00] opacity-0 group-hover:opacity-10 transition-opacity" />
                         <span className="text-[7px] font-black uppercase tracking-[0.2em] mb-1">Studio</span>
