@@ -91,16 +91,32 @@ const Explore = () => {
         } catch (err) { alert("Bid failed"); }
     };
 
-    const addToCart = (art, redirect = false) => {
-        if (art.isSold) return;
-        const finalPrice = art.highestBid || art.price;
-        const cart = JSON.parse(localStorage.getItem('cart')) || [];
-        const cleanCart = cart.filter(item => item._id !== art._id);
-        const cartItem = { ...art, price: finalPrice, cartId: Date.now(), quantity: 1 };
-        localStorage.setItem('cart', JSON.stringify([...cleanCart, cartItem]));
-        window.dispatchEvent(new Event('storage'));
-        if (redirect) navigate('/cart');
+   const addToCart = (art, redirect = false) => {
+    // ❌ BLOCK auction items completely
+    if (art.isAuction) {
+        alert("❌ This artwork is under auction. You can only place bids.");
+        return;
+    }
+
+    if (art.isSold) return;
+
+    const finalPrice = art.highestBid || art.price;
+    const cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+    const cleanCart = cart.filter(item => item._id !== art._id);
+
+    const cartItem = {
+        ...art,
+        price: finalPrice,
+        cartId: Date.now(),
+        quantity: 1
     };
+
+    localStorage.setItem('cart', JSON.stringify([...cleanCart, cartItem]));
+    window.dispatchEvent(new Event('storage'));
+
+    if (redirect) navigate('/cart');
+};
 
     const toggleLike = async (e, artId) => {
         e.stopPropagation();
@@ -222,8 +238,13 @@ const Explore = () => {
                         <p className="text-[9px] font-black text-zinc-300 uppercase">{isAuction ? 'High Bid' : 'Price'}</p>
                         <p className={`text-2xl font-black ${isAuction ? 'text-red-600' : 'text-zinc-900'}`}>₹{(art.highestBid || art.price).toLocaleString()}</p>
                     </div>
-                    <button onClick={() => { handleArtClick(art); if (isAuction) setShowBidModal(true); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase shadow-lg ${isAuction ? 'bg-red-600 text-white' : 'bg-black text-white'}`}>
-                        {isAuction ? 'Place Bid' : 'View Piece'}
+                    <button onClick={() => { 
+    handleArtClick(art); 
+    if (isAuction && timeLeftMap[art._id] !== "EXPIRED") {
+        setShowBidModal(true);
+    }
+}} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase shadow-lg ${isAuction ? 'bg-red-600 text-white' : 'bg-black text-white'}`}>
+                        {isAuction && timeLeftMap[art._id] !== "EXPIRED" ? 'Place Bid' : 'View Piece'}
                     </button>
                 </div>
             </div>
@@ -346,7 +367,25 @@ const Explore = () => {
                             </div>
                             <div className="p-10 bg-zinc-50/50 border-t border-zinc-100 mt-auto">
                                 <div className="mb-8"><p className="text-6xl font-black tracking-tighter">₹{(selectedArt.highestBid || selectedArt.price).toLocaleString()}</p></div>
-                                {!selectedArt.isSold ? ( <button onClick={() => addToCart(selectedArt, true)} className="w-full bg-[#FF8C00] text-white py-6 rounded-2xl font-black text-sm uppercase shadow-xl hover:bg-[#e67e00]">Purchase Piece</button> ) : ( <div className="w-full bg-zinc-900 text-zinc-400 py-6 rounded-2xl font-black text-center uppercase text-[10px]">Registry Asset</div> )}
+                                {selectedArt.isAuction && timeLeftMap[selectedArt._id] !== "EXPIRED" ? (
+    <button 
+        onClick={() => setShowBidModal(true)}
+        className="w-full bg-red-600 text-white py-6 rounded-2xl font-black text-sm uppercase shadow-xl"
+    >
+        Place Bid
+    </button>
+) : !selectedArt.isSold ? (
+    <button 
+        onClick={() => addToCart(selectedArt, true)}
+        className="w-full bg-[#FF8C00] text-white py-6 rounded-2xl font-black text-sm uppercase shadow-xl hover:bg-[#e67e00]"
+    >
+        Purchase Piece
+    </button>
+) : (
+    <div className="w-full bg-zinc-900 text-zinc-400 py-6 rounded-2xl font-black text-center uppercase text-[10px]">
+        Registry Asset
+    </div>
+)}
                             </div>
                         </div>
                     </div>

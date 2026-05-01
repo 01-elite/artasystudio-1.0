@@ -138,10 +138,7 @@ Return ONLY JSON:
     let sort = {};
     const filters = aiData.filters || {};
 
-    // ✅ CATEGORY
-    if (filters.category) {
-      query.category = filters.category;
-    }
+   
 
     // =======================
     // 💰 SAFE PRICE (AI)

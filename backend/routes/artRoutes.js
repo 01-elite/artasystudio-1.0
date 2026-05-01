@@ -62,15 +62,42 @@ router.put('/bid/:artId', async (req, res) => {
         const { userId, amount } = req.body;
         const art = await Artwork.findById(req.params.artId);
 
-        if (amount <= art.highestBid) {
-            return res.status(400).json({ message: "Bid must be higher than current highest bid" });
+        if (!art) {
+            return res.status(404).json({ message: "Artwork not found" });
         }
 
-        // ✅ NEW ADDITION: Record bid behavior in User Profile (Weight: 10 points)
+        // ✅ CHECK: Auction expired or not
+        const now = new Date();
+        if (art.auctionEnd && new Date(art.auctionEnd) < now) {
+
+            // 🔥 AUTO-CONVERT AUCTION → NORMAL PRODUCT
+            if (art.isAuction) {
+                art.isAuction = false;
+                art.price = art.highestBid || art.price;
+                await art.save();
+            }
+
+            return res.status(400).json({ 
+                message: "Auction has ended. Bidding is closed." 
+            });
+        }
+
+        // ❌ Prevent invalid bid
+        const currentBid = art.highestBid || art.price;
+        if (amount <= currentBid) {
+            return res.status(400).json({ 
+                message: `Bid must be higher than ₹${currentBid}` 
+            });
+        }
+
+        // ✅ Record user bid behavior
         if (userId) {
-            await User.findByIdAndUpdate(userId, { $addToSet: { bidArt: req.params.artId } });
+            await User.findByIdAndUpdate(userId, { 
+                $addToSet: { bidArt: req.params.artId } 
+            });
         }
 
+        // ✅ Update bid
         const updatedArt = await Artwork.findByIdAndUpdate(
             req.params.artId,
             { 
@@ -81,6 +108,7 @@ router.put('/bid/:artId', async (req, res) => {
         ).populate('bids.bidder', 'name');
 
         res.json(updatedArt);
+
     } catch (err) { 
         res.status(500).json({ message: "Bidding failed" }); 
     }
