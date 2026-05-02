@@ -55,27 +55,47 @@ const Profile = () => {
 
     const handleFinish = async () => {
         try {
+            // Validate username is not empty
+            if (!formData.username || formData.username.trim() === '') {
+                return alert("⚠️ Username is required!");
+            }
+
             const payload = {
                 username: formData.username,
                 role: formData.role,
                 categoryPreferences: formData.categories,
                 address: { 
-                    phone: formData.phone,
-                    street: formData.street,
-                    city: formData.city,
-                    state: formData.state,
-                    pincode: formData.pincode
+                    phone: formData.phone || '',
+                    street: formData.street || '',
+                    city: formData.city || '',
+                    state: formData.state || '',
+                    pincode: formData.pincode || ''
                 }
             };
+
+            console.log("Sending payload:", payload);
+            console.log("User ID:", loggedInUser._id);
+
             const { data } = await axios.put(`http://localhost:5001/api/auth/update-address/${loggedInUser._id}`, payload);
+            
+            console.log("Response data:", data);
+            
             localStorage.setItem("user", JSON.stringify(data));
             setLoggedInUser(data); 
             setProfileUser(data);
             setShowJourney(false);
             setIsEditing(false);
-            alert("Profile & Shipping Address Updated!");
-            if (payload.role !== loggedInUser.role) window.location.reload();
-        } catch (err) { alert("Error: Update failed."); }
+            setStep(1);
+            alert("✅ Profile & Shipping Address Updated Successfully!");
+            
+            if (payload.role !== loggedInUser.role) {
+                window.location.reload();
+            }
+        } catch (err) {
+            console.error("Update Error Details:", err);
+            const errorMsg = err.response?.data?.message || err.message || "Update failed";
+            alert(`❌ Error: ${errorMsg}`);
+        }
     };
 
     if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-[#FF8C00]" /></div>;

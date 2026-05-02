@@ -114,7 +114,127 @@ router.put('/bid/:artId', async (req, res) => {
     }
 });
 
-// ✅ NEW ADDITION: 5. BEHAVIORAL AI RECOMMENDATION ENGINE
+// ✅ NEW ADDITION: 5. POINT-BASED SCORING SYSTEM FOR INTERACTIONS
+
+// 5a. Track Like Action (+5 Points)
+router.post('/track-like', async (req, res) => {
+    try {
+        const { userId, artId } = req.body;
+        if (!userId || !artId) return res.status(400).json({ message: "userId and artId required" });
+
+        // Check if already liked
+        const user = await User.findById(userId);
+        const alreadyLiked = user.userInteractions.some(
+            i => i.artworkId.toString() === artId && i.action === 'like'
+        );
+
+        if (alreadyLiked) {
+            return res.status(400).json({ message: "Already liked" });
+        }
+
+        // Record interaction with 5 points
+        await User.findByIdAndUpdate(userId, {
+            $addToSet: { likedArt: artId },
+            $push: { 
+                userInteractions: {
+                    artworkId: artId,
+                    action: 'like',
+                    points: 5
+                }
+            }
+        });
+
+        res.status(200).json({ message: "Like recorded (+5 points)" });
+    } catch (err) {
+        res.status(500).json({ message: "Like tracking failed" });
+    }
+});
+
+// 5b. Track View Action (+2 Points)
+router.post('/track-view', async (req, res) => {
+    try {
+        const { userId, artId } = req.body;
+        if (!userId || !artId) return res.status(400).json({ message: "userId and artId required" });
+
+        // Record interaction with 2 points
+        await User.findByIdAndUpdate(userId, {
+            $addToSet: { viewedArt: artId },
+            $push: { 
+                userInteractions: {
+                    artworkId: artId,
+                    action: 'view',
+                    points: 2
+                }
+            }
+        });
+
+        res.status(200).json({ message: "View recorded (+2 points)" });
+    } catch (err) {
+        res.status(500).json({ message: "View tracking failed" });
+    }
+});
+
+// 5c. Track Purchase Action (+15 Points)
+router.post('/track-purchase', async (req, res) => {
+    try {
+        const { userId, artId } = req.body;
+        if (!userId || !artId) return res.status(400).json({ message: "userId and artId required" });
+
+        // Record interaction with 15 points
+        await User.findByIdAndUpdate(userId, {
+            $addToSet: { purchasedArt: artId },
+            $push: { 
+                userInteractions: {
+                    artworkId: artId,
+                    action: 'purchase',
+                    points: 15
+                }
+            }
+        });
+
+        res.status(200).json({ message: "Purchase recorded (+15 points)" });
+    } catch (err) {
+        res.status(500).json({ message: "Purchase tracking failed" });
+    }
+});
+
+// 5d. Track Time Spent (>30 seconds = +4 Points)
+router.post('/track-time-spent', async (req, res) => {
+    try {
+        const { userId, artId, timeSeconds } = req.body;
+        if (!userId || !artId || timeSeconds === undefined) {
+            return res.status(400).json({ message: "userId, artId, and timeSeconds required" });
+        }
+
+        const timeSpent = parseInt(timeSeconds);
+        
+        // Only give points if time spent > 30 seconds
+        if (timeSpent > 30) {
+            await User.findByIdAndUpdate(userId, {
+                $push: { 
+                    userInteractions: {
+                        artworkId: artId,
+                        action: 'timeSpent',
+                        points: 4
+                    }
+                }
+            });
+
+            // Update or create art view duration record
+            await User.findByIdAndUpdate(userId, {
+                $addToSet: { artViewDuration: { artworkId: artId, totalTimeSeconds: timeSpent } }
+            });
+
+            return res.status(200).json({ message: `Time spent recorded (+4 points)` });
+        } else {
+            return res.status(200).json({ message: `Less than 30 seconds (${timeSpent}s) - no points awarded` });
+        }
+    } catch (err) {
+        res.status(500).json({ message: "Time tracking failed" });
+    }
+});
+
+// ✅ UPDATED: 6. BEHAVIORAL AI RECOMMENDATION ENGINE WITH POINT-BASED SCORING
 router.get('/recommend/:artId', async (req, res) => {
     try {
         const { artId } = req.params;
@@ -136,12 +256,20 @@ router.get('/recommend/:artId', async (req, res) => {
                     let score = 0;
                     const idStr = art._id.toString();
 
-    
-                    // Scoring Points System
-                    if (user.bidArt?.some(id => id.toString() === idStr)) score += 10;
-                    if (user.likedArt?.some(id => id.toString() === idStr)) score += 7;
-                    if (user.viewedArt?.some(id => id.toString() === idStr)) score += 10;
-                    if (art.category === currentArt.category) score += 20;
+                    // Calculate total interaction points for this artwork
+                    const interactions = user.userInteractions.filter(
+                        i => i.artworkId?.toString() === idStr
+                    );
+                    
+                    interactions.forEach(interaction => {
+                        score += interaction.points || 0;
+                    });
+
+                    // Bonus: Same category as currently viewed (+10 bonus points)
+                    if (art.category === currentArt.category) score += 10;
+
+                    // Bonus: Similar creator
+                    if (art.creator?.toString() === currentArt.creator?.toString()) score += 8;
 
                     return { ...art, aiScore: score };
                 });
@@ -160,15 +288,26 @@ router.get('/recommend/:artId', async (req, res) => {
     }
 });
 
-// ✅ NEW ADDITION: 6. TRACKING ROUTE (Record View Behavior - Weight: 3 points)
-router.put('/track-view', async (req, res) => {
+// ✅ GET USER INTERACTION SCORE (for analytics/profile)
+router.get('/user-interaction-score/:userId', async (req, res) => {
     try {
-        const { userId, artId } = req.body;
-        // Saves view to User profile for permanent AI learning
-        await User.findByIdAndUpdate(userId, { $addToSet: { viewedArt: artId } });
-        res.status(200).json({ message: "Behavior recorded" });
-    } catch (err) {
-        res.status(500).json({ message: "Tracking failed" });
+        const user = await User.findById(req.params.userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        const interactions = user.userInteractions || [];
+        const totalPoints = interactions.reduce((sum, i) => sum + (i.points || 0), 0);
+        
+        const breakdown = {
+            likes: interactions.filter(i => i.action === 'like').length * 5,
+            views: interactions.filter(i => i.action === 'view').length * 2,
+            purchases: interactions.filter(i => i.action === 'purchase').length * 15,
+            timeSpent: interactions.filter(i => i.action === 'timeSpent').length * 4,
+            totalPoints: totalPoints
+        };
+
+        res.status(200).json(breakdown);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch interaction score" });
     }
 });
 

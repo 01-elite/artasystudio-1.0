@@ -25,6 +25,7 @@ const Explore = () => {
     const [maxPrice, setMaxPrice] = useState(200000);
     const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || {});
     const userPrefs = user?.categoryPreferences || [];
+    const [viewStartTime, setViewStartTime] = useState(null);
 
     // -- CHATBOT STATE --
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -68,14 +69,34 @@ const Explore = () => {
     // -- HANDLERS --
     const handleArtClick = async (art) => {
         setSelectedArt(art);
+        setViewStartTime(Date.now());
         const userIdParam = user?._id ? `?userId=${user._id}` : '';
         try {
             if (user?._id && art?._id) {
-                await axios.put(`http://localhost:5001/api/art/track-view`, { userId: user._id, artId: art._id });
+                // Track view with +2 points
+                await axios.post(`http://localhost:5001/api/art/track-view`, { userId: user._id, artId: art._id });
             }
             const aiRes = await axios.get(`http://localhost:5001/api/art/recommend/${art._id}${userIdParam}`);
             setBehavioralRecs(aiRes.data);
         } catch (err) { console.error("AI tracking failed", err); }
+    };
+
+    // Track time spent when closing modal
+    const handleCloseModal = async () => {
+        if (selectedArt && user?._id && viewStartTime) {
+            const timeSpent = Math.floor((Date.now() - viewStartTime) / 1000); // Convert to seconds
+            try {
+                if (timeSpent > 0) {
+                    await axios.post(`http://localhost:5001/api/art/track-time-spent`, {
+                        userId: user._id,
+                        artId: selectedArt._id,
+                        timeSeconds: timeSpent
+                    });
+                }
+            } catch (err) { console.error("Time tracking failed", err); }
+        }
+        setSelectedArt(null);
+        setViewStartTime(null);
     };
 
     const handlePlaceBid = async () => {
@@ -91,7 +112,7 @@ const Explore = () => {
         } catch (err) { alert("Bid failed"); }
     };
 
-   const addToCart = (art, redirect = false) => {
+   const addToCart = async (art, redirect = false) => {
     // ❌ BLOCK auction items completely
     if (art.isAuction) {
         alert("❌ This artwork is under auction. You can only place bids.");
@@ -99,6 +120,16 @@ const Explore = () => {
     }
 
     if (art.isSold) return;
+
+    // Track purchase with +15 points
+    if (user?._id) {
+        try {
+            await axios.post(`http://localhost:5001/api/art/track-purchase`, {
+                userId: user._id,
+                artId: art._id
+            });
+        } catch (err) { console.error("Purchase tracking failed", err); }
+    }
 
     const finalPrice = art.highestBid || art.price;
     const cart = JSON.parse(localStorage.getItem('cart')) || [];
@@ -121,15 +152,30 @@ const Explore = () => {
     const toggleLike = async (e, artId) => {
         e.stopPropagation();
         if (!user?._id) return alert("Login to like!");
+        
+        const isLiked = likedItems.has(artId);
+        
+        // Don't allow unliking
+        if (isLiked) {
+            return alert("Already liked!");
+        }
+
         try {
+            // Track like with +5 points
+            await axios.post(`http://localhost:5001/api/art/track-like`, { userId: user._id, artId });
+            
+            // Also update via auth like endpoint for UI consistency
             const res = await axios.put(`http://localhost:5001/api/auth/like-art`, { userId: user._id, artId });
+            
             const newLikes = new Set(likedItems);
-            likedItems.has(artId) ? newLikes.delete(artId) : newLikes.add(artId);
+            newLikes.add(artId);
             setLikedItems(newLikes);
             localStorage.setItem('user', JSON.stringify({ ...user, likedArt: res.data.likedArt }));
+            
+            // Get updated recommendations
             const aiRes = await axios.get(`http://localhost:5001/api/art/recommend/${artId}?userId=${user._id}`);
             setBehavioralRecs(aiRes.data);
-        } catch (err) { console.error("Like failed"); }
+        } catch (err) { console.error("Like failed", err); }
     };
 
     const sendChatMessage = async () => {
@@ -314,7 +360,10 @@ const Explore = () => {
                             <input type="text" placeholder="Search..." className="bg-transparent outline-none text-xs font-bold w-full text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                         </div>
                         <select className="px-5 py-3 bg-zinc-50 rounded-full text-xs font-black uppercase outline-none text-black" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                            <option value="All">All Categories</option><option value="Sketching">Sketching</option><option value="Oil Painting">Oil Painting</option><option value="Anime & Manga">Anime & Manga</option>
+                            <option value="All">All Categories</option>
+                            {[...new Set(artworks.map(art => art.category))].sort().map(category => (
+                                <option key={category} value={category}>{category}</option>
+                            ))}
                         </select>
                         <div className="flex items-center gap-4 px-6 py-2 bg-zinc-50 rounded-full">
                             <span className="text-[9px] font-black uppercase text-zinc-400">Max: ₹{maxPrice.toLocaleString()}</span>
@@ -322,7 +371,9 @@ const Explore = () => {
                         </div>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 px-4">{publicStudio.map(art => <ArtCard key={art._id} art={art} isAuction={false} isGrid={true} />)}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 px-4">
+                    {publicStudio.map(art => <ArtCard key={art._id} art={art} isAuction={false} isGrid={true} />)}
+                </div>
             </div>
 
             {museumArchive.length > 0 && (
@@ -347,7 +398,7 @@ const Explore = () => {
 
             {selectedArt && !showBidModal && (
                 <div className="fixed inset-0 z-[100] bg-zinc-950/98 backdrop-blur-2xl flex items-center justify-center p-4 text-left text-black">
-                    <button onClick={() => setSelectedArt(null)} className="absolute top-10 right-10 text-white/50 hover:text-white transition-colors"><X size={48}/></button>
+                    <button onClick={handleCloseModal} className="absolute top-10 right-10 text-white/50 hover:text-white transition-colors"><X size={48}/></button>
                     <div className="bg-white max-w-[1200px] w-full rounded-[2.5rem] overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[80vh] shadow-2xl relative">
                         <div className="flex-1 bg-[#F5F5F7] flex items-center justify-center p-6 md:p-12 relative">
                             <img src={selectedArt.image} className="max-h-full max-w-full object-contain rounded-2xl" alt="" />
@@ -361,9 +412,36 @@ const Explore = () => {
                                 </div>
                                 {!selectedArt.isSold && <button onClick={(e) => toggleLike(e, selectedArt._id)} className="p-3 bg-zinc-50 rounded-full"><Heart size={20} className={likedItems.has(selectedArt._id) ? "fill-red-500 text-red-500" : "text-zinc-400"} /></button>}
                             </div>
-                            <div className="p-10 flex-grow space-y-6">
+                            <div className="p-10 flex-grow space-y-6 overflow-y-auto">
                                 <h3 className="text-5xl font-black uppercase tracking-tighter">{selectedArt.title}</h3>
                                 <p className="text-zinc-500 font-medium italic text-lg leading-relaxed">{selectedArt.description}</p>
+                                
+                                {/* RECOMMENDATIONS SECTION */}
+                                {behavioralRecs.length > 0 && (
+                                    <div className="mt-8 pt-6 border-t border-zinc-200">
+                                        <h4 className="text-sm font-black uppercase text-zinc-600 mb-4 flex items-center gap-2">
+                                            <Sparkles size={14} className="text-[#FF8C00]" /> You Might Like
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {behavioralRecs.slice(0, 4).map(rec => (
+                                                <div 
+                                                    key={rec._id} 
+                                                    className="bg-zinc-50 rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform group"
+                                                    onClick={() => handleArtClick(rec)}
+                                                >
+                                                    <div className="aspect-square bg-zinc-200 overflow-hidden">
+                                                        <img src={rec.image} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                                                    </div>
+                                                    <div className="p-2">
+                                                        <p className="text-[10px] font-black uppercase text-zinc-700 truncate">{rec.title}</p>
+                                                        <p className="text-[9px] text-[#FF8C00] font-black">₹{rec.price.toLocaleString()}</p>
+                                                        {rec.aiScore > 0 && <p className="text-[8px] text-zinc-500 font-bold">Score: {rec.aiScore}</p>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div className="p-10 bg-zinc-50/50 border-t border-zinc-100 mt-auto">
                                 <div className="mb-8"><p className="text-6xl font-black tracking-tighter">₹{(selectedArt.highestBid || selectedArt.price).toLocaleString()}</p></div>

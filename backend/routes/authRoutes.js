@@ -6,27 +6,43 @@ const User = require('../models/User');
 router.put('/update-address/:userId', async (req, res) => {
     try {
         const { username, role, categoryPreferences, address } = req.body;
+        
+        // Check if username is already taken by another user
+        if (username && username.trim() !== '') {
+            const existingUser = await User.findOne({ 
+                username: username,
+                _id: { $ne: req.params.userId } // Exclude current user
+            });
+            
+            if (existingUser) {
+                return res.status(400).json({ message: "Username already taken. Choose a different one." });
+            }
+        }
+
+        const updateData = { 
+            role: role,
+            categoryPreferences: categoryPreferences || [],
+            address: address || {}
+        };
+
+        // Only update username if provided and not empty
+        if (username && username.trim() !== '') {
+            updateData.username = username;
+        }
 
         const updatedUser = await User.findByIdAndUpdate(
             req.params.userId,
-            { 
-                $set: { 
-                    username: username,
-                    role: role,
-                    categoryPreferences: categoryPreferences,
-                    address: address 
-                } 
-            },
-            { new: true, runValidators: true }
+            { $set: updateData },
+            { new: true, runValidators: false } // Disable validators to avoid duplicate key error
         );
 
         if (!updatedUser) return res.status(404).json({ message: "User not found" });
 
+        console.log("User updated successfully:", updatedUser._id);
         res.json(updatedUser);
     } catch (err) {
         console.error("Update Error:", err);
-        if (err.code === 11000) return res.status(400).json({ message: "Username already taken." });
-        res.status(500).json({ message: "Update failed" });
+        res.status(500).json({ message: err.message || "Update failed" });
     }
 });
 
